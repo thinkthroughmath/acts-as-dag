@@ -295,7 +295,7 @@ module Dag
             def #{prefix}self_and_descendants
               [self] + #{prefix}descendants
             end
-            
+
             def #{prefix}leaf?
               self.#{prefix}links_as_ancestor.empty?
 						end

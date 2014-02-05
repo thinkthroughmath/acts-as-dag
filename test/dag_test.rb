@@ -943,10 +943,11 @@ class DagTest < Minitest::Test
              1,
              3,
              'f',
-             1 );", healing_sql
+             1 );".gsub(/\s+/, " ").strip, healing_sql
     ActiveRecord::Base.connection.execute healing_sql
     missing_links = Default.check_for_missing_indirect_links
     assert_equal [], missing_links
   end
+
 
 end

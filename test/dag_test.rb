@@ -847,4 +847,106 @@ class DagTest < Minitest::Test
     e.destroy
   end
 
+  ############################################################################################
+  # Tests Check
+  ############################################################################################
+
+  def setup_basic_dag
+    @a = Node.create!
+    @b = Node.create!
+    @c = Node.create!
+    @d = Node.create!
+    @e = Node.create!
+    @e1 = Default.create_edge!(@a,@b)
+    @e2 = Default.create_edge!(@b,@c)
+    @e3 = Default.create_edge!(@c,@d)
+    @e4 = Default.create_edge!(@b,@e)
+    @check_expected_edge_count = 4
+    @check_expected_link_count = 8
+    @check_expected_node_count = 5
+  end
+
+  def get_first_indirect_edge_id
+    ActiveRecord::Base.connection.execute("SELECT * from edges where direct = 'f' limit 1;")[0]["id"]
+  end
+
+  def delete_indirect_edge(edge_id)
+    # Somehow, we are getting our graphs in a state where not all of the indirect edges are linked.
+    # This puts our test graph into this state so that we can make sure that check and heal works.
+    ActiveRecord::Base.connection.execute("DELETE FROM edges WHERE id = #{edge_id};")
+  end
+
+  def delete_all_indirect_edges
+    Default.all.each { |d| delete_indirect_edge(d.id) unless d.direct }
+  end
+
+  def increment_link_count(link_id)
+    # Another weird problem we saw was that sometimes the links to a descendant node would always have
+    # a higher count than they actually should have had (2 when there was only 1 path to the descendant).
+    # I wonder if this problem arose from a 'manual' deletion?
+    ActiveRecord::Base.connection.execute("UPDATE edges SET count = count + 1 WHERE id = #{link_id};")
+  end
+
+  def increment_all_link_counts_for_node(node)
+    node.links_as_descendant.each { |l| increment_link_count(l.id) }
+  end
+
+  def tests_edge_count
+    setup_basic_dag
+    assert_equal @check_expected_edge_count, Default.edge_count
+  end
+
+  def tests_link_count
+    setup_basic_dag
+    assert_equal @check_expected_link_count, Default.link_count
+  end
+
+  def tests_node_count
+    setup_basic_dag
+    assert_equal @check_expected_node_count, Default.node_count
+  end
+
+  def tests_edge_and_link_counts_after_deleting_indirect_link
+    setup_basic_dag
+    delete_indirect_edge get_first_indirect_edge_id
+    assert_equal @check_expected_edge_count, Default.edge_count # Edge count shouldn't change
+    assert_equal @check_expected_link_count - 1, Default.link_count
+  end
+
+  def tests_link_counts_after_incrementing
+    setup_basic_dag
+    n = Node.last
+    increment_all_link_counts_for_node n
+    n.reload
+    assert_equal 2, n.links_as_descendant.first.count
+  end
+
+  def test_indirect_link_checker_for_graph
+    setup_basic_dag
+    delete_all_indirect_edges
+    missing_links = Default.check_for_missing_indirect_links
+    assert_equal [[1,3], [1,4], [1,5], [2,4]], missing_links.sort
+  end
+
+  def test_healing_missing_indirect_links
+    setup_basic_dag
+    first_indirect_edge_id = get_first_indirect_edge_id
+    delete_indirect_edge first_indirect_edge_id
+    healing_sql = Default.get_sql_to_heal_missing_indirect_links
+    assert_equal "
+          INSERT INTO edges
+            (ancestor_id,
+             descendant_id,
+             direct,
+             count
+            ) VALUES (
+             1,
+             3,
+             'f',
+             1 );", healing_sql
+    ActiveRecord::Base.connection.execute healing_sql
+    missing_links = Default.check_for_missing_indirect_links
+    assert_equal [], missing_links
+  end
+
 end

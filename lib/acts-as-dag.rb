@@ -10,6 +10,7 @@ require "dag/polymorphic"
 require "dag/standard"
 require "dag/edges"
 require "dag/validators"
+require "dag/check"
 
 $LOAD_PATH.shift
 

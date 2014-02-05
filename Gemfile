@@ -6,6 +6,7 @@ gem 'rails', '3.2.12'
 gem 'rack'
 gem 'jeweler'
 gem 'sqlite3'
+gem 'rgl'
 
 group :development, :test do
   gem 'pry'

@@ -133,6 +133,9 @@ module Dag
 						end
       end_eval
     end
+
+    extend Check
+
   end
 
   def has_dag_links(options = {})
@@ -157,6 +160,11 @@ module Dag
     prefix = conf[:prefix]
     dag_link_class_name = conf[:link_class_name]
     dag_link_class = conf[:link_class_name].constantize
+
+    # Adding a to_s for nicer-to-look-at dot graphs.
+    self.class_eval <<-EOL
+      def to_s; self.id; end
+    EOL
 
     if dag_link_class.acts_as_dag_polymorphic?
       self.class_eval <<-EOL

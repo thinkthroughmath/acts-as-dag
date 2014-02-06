@@ -23,6 +23,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rake'
   s.add_development_dependency 'sqlite3'
   s.add_runtime_dependency 'activemodel'
-  s.add_runtime_dependency 'activerecord'
+  s.add_runtime_dependency 'activerecord', '>= 0', '~> 3.2.12'
   s.add_runtime_dependency 'rgl'
 end

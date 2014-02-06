@@ -26,28 +26,6 @@ module Dag
       missing_indirect_links
     end
 
-    def get_sql_to_heal_missing_indirect_links
-      missing_indirect_links = check_for_missing_indirect_links
-      sql_statements = []
-      missing_indirect_links.each { |ml| sql_statements << heal_missing_indirect_link( *ml ) }
-      sql_statements.join "\n"
-    end
-
-    def heal_missing_indirect_link(source, sink)
-      # I was going to have this just execute the sql to fix the problem, but our sharding makes this rather
-      # difficult...
-          "INSERT INTO #{self.table_name}
-            (#{self.acts_as_dag_options[:ancestor_id_column]},
-             #{self.acts_as_dag_options[:descendant_id_column]},
-             #{self.acts_as_dag_options[:direct_column]},
-             #{self.acts_as_dag_options[:count_column]}
-            ) VALUES (
-             #{source},
-             #{sink},
-             'f',
-             1 );".gsub(/\s+/, " ").strip
-    end
-
     def check_for_missing_indirect_links_for_node(node)
       direct_ancestors = get_ancestors_for_node(node).to_a
       missing_ancestors = direct_ancestors - node.ancestors.flatten if node.ancestors.exists?

@@ -926,22 +926,34 @@ class DagTest < Test::Unit::TestCase
     setup_basic_dag
     first_indirect_edge_id = get_first_indirect_edge_id
     delete_indirect_edge first_indirect_edge_id
-    healing_sql = Default.get_sql_to_heal_missing_indirect_links
-    assert_equal "
-          INSERT INTO edges
-            (ancestor_id,
-             descendant_id,
-             direct,
-             count
-            ) VALUES (
-             1,
-             3,
-             'f',
-             1 );".gsub(/\s+/, " ").strip, healing_sql
+    healing_sql = convert_missing_indirect_links_into_sql Default.check_for_missing_indirect_links
+
     ActiveRecord::Base.connection.execute healing_sql
     missing_links = Default.check_for_missing_indirect_links
     assert_equal [], missing_links
   end
 
+  def convert_missing_indirect_links_into_sql missing_indirect_links
+      sql_statements = []
+      missing_indirect_links.each { |ml| sql_statements << heal_missing_indirect_link( *ml ) }
+      sql_statements.join "\n"
+    end
+
+  def heal_missing_indirect_link(source, sink)
+    # I wanted this to be part of the check and heal class, but our instance is 'special'
+    # because of sharding and additional required fields - and everyone else's might be too.
+    # So I think I'll just have the check return missing links and let the client handle
+    # that however it wants to.
+    "INSERT INTO #{Default.table_name}
+      (#{Default.acts_as_dag_options[:ancestor_id_column]},
+       #{Default.acts_as_dag_options[:descendant_id_column]},
+       #{Default.acts_as_dag_options[:direct_column]},
+       #{Default.acts_as_dag_options[:count_column]}
+      ) VALUES (
+       #{source},
+       #{sink},
+       'f',
+       1 );".gsub(/\s+/, " ").strip
+    end
 
 end

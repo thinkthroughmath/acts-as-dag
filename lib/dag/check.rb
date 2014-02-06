@@ -1,5 +1,6 @@
 require "rgl/implicit"
 require "rgl/traversal"
+require "rgl/topsort"
 
 module Dag
   module Check
@@ -58,13 +59,43 @@ module Dag
 
     def get_ancestors_for_node(node)
       tree = reverse_rgl_graph.bfs_search_tree_from(node)
-      reverse_rgl_graph.vertices_filtered_by { |v| tree.has_vertex? v unless v == node }
+      tree.vertices - [node]
     end
 
-    ## Check for wrong counts
+    def get_path_count_from_node(from)
+      tree = rgl_graph.bfs_search_tree_from(from)
+      top = tree.topsort_iterator
+      counts = Hash[ top.to_a.zip( Array.new(top.count) { 0 } ) ]
+      counts[from] = 1
 
+      top.each do |v|
+        # get immediate children
+        children = rgl_graph.edges_filtered_by { |source, sink| source == v && tree.has_vertex?(sink) }
 
+        # set count for child = count for child + count for self
+        children.each_edge do |parent, child|
+          counts[child] += counts[parent]
+        end
+      end
+      counts
+    end
 
+    def get_path_counts
+      path_counts = Hash[rgl_graph.to_a.zip(Array.new(self.count))]
+      path_counts.each { |start, counts| path_counts[start] = get_path_count_from_node(start) }
+      path_counts
+    end
+
+    def check_path_counts
+      path_counts = get_path_counts
+      incorrect_path_counts = []
+      self.all.each do |e|
+        if e.count != path_counts[e.ancestor][e.descendant]
+          incorrect_path_counts << { count_should_be: path_counts[e.ancestor][e.descendant], for_link: e }
+        end
+      end
+      incorrect_path_counts
+    end
 
   end
 end

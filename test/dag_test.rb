@@ -857,10 +857,10 @@ class DagTest < Minitest::Test
     @c = Node.create!
     @d = Node.create!
     @e = Node.create!
-    @e1 = Default.create_edge!(@a,@b)
-    @e2 = Default.create_edge!(@b,@c)
-    @e3 = Default.create_edge!(@c,@d)
-    @e4 = Default.create_edge!(@b,@e)
+    @e1 = Default.create_edge! @a,@b
+    @e2 = Default.create_edge! @b,@c
+    @e3 = Default.create_edge! @c,@d
+    @e4 = Default.create_edge! @b,@e
     @check_expected_edge_count = 4
     @check_expected_link_count = 8
     @check_expected_node_count = 5
@@ -915,10 +915,39 @@ class DagTest < Minitest::Test
 
   def tests_link_counts_after_incrementing
     setup_basic_dag
-    n = Node.last
-    increment_all_link_counts_for_node n
-    n.reload
-    assert_equal 2, n.links_as_descendant.first.count
+    increment_all_link_counts_for_node @e
+    @e.reload
+    assert_equal 2, @e.links_as_descendant.first.count
+  end
+
+  def tests_basic_path_counts_from_node
+    setup_basic_dag
+    path_counts = Default.get_path_count_from_node @a
+    assert path_counts.all? { |n, c| c == 1 }
+
+    Default.create_edge! @c, @e
+    path_counts = Default.get_path_count_from_node @b
+    assert_equal 2, path_counts[@e]
+  end
+
+  def test_path_counts
+    setup_basic_dag
+    path_counts = Default.get_path_counts
+    assert path_counts.values.all? { |pc| pc.all? { |n, c| c == 1 } }
+
+    Default.create_edge! @c, @e
+    path_counts = Default.get_path_counts
+    assert_equal 2, path_counts[@b][@e]
+  end
+
+  def test_path_count_check
+    setup_basic_dag
+    incorrect_path_counts = Default.check_path_counts
+    assert_equal [], incorrect_path_counts
+
+    increment_all_link_counts_for_node @e
+    incorrect_path_counts = Default.check_path_counts
+    assert_equal 2, incorrect_path_counts.count
   end
 
   def test_indirect_link_checker_for_graph
@@ -946,7 +975,7 @@ class DagTest < Minitest::Test
     end
 
   def heal_missing_indirect_link(source, sink)
-    # I wanted this to be part of the check and heal class, but our instance is 'special'
+    # I wanted this to be part of the check and heal module, but our instance is 'special'
     # because of sharding and additional required fields - and everyone else's might be too.
     # So I think I'll just have the check return missing links and let the client handle
     # that however it wants to.

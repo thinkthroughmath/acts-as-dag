@@ -968,6 +968,15 @@ class DagTest < Minitest::Test
     assert_equal [], missing_links
   end
 
+  def test_path_count_with_progress
+    setup_basic_dag
+    processed_total = []
+    incorrect_path_counts = Default.check_path_counts do |processed, total|
+      processed_total << [processed, total]
+    end
+    assert_equal [[1,5],[2,5],[3,5],[4,5],[5,5]], processed_total
+  end
+
   def convert_missing_indirect_links_into_sql missing_indirect_links
       sql_statements = []
       missing_indirect_links.each { |ml| sql_statements << heal_missing_indirect_link( *ml ) }

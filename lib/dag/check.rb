@@ -82,12 +82,25 @@ module Dag
 
     def get_path_counts
       path_counts = Hash[rgl_graph.to_a.zip(Array.new(self.count))]
-      path_counts.each { |start, counts| path_counts[start] = get_path_count_from_node(start) }
+
+      nodes_checked = 0
+      nodes_total = path_counts.count
+
+      path_counts.each do |start, counts|
+        path_counts[start] = get_path_count_from_node(start)
+        nodes_checked += 1
+        yield nodes_checked, nodes_total if block_given?
+      end
       path_counts
     end
 
     def check_path_counts
-      path_counts = get_path_counts
+      if block_given?
+        # pass along our method to report progress...
+        path_counts = get_path_counts &Proc.new
+      else
+        path_counts = get_path_counts
+      end
       incorrect_path_counts = []
       self.all.each do |e|
         if e.count != path_counts[e.ancestor][e.descendant]
